@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import DachshundCompanion from "@/components/DachshundCompanion";
 
 // Nombres de archivos en public/recuerdos/ (extensión .jpeg)
 const recuerdos = [
@@ -101,6 +102,14 @@ export default function SanValentinPage() {
               transition={{ duration: 0.4 }}
               className="space-y-8"
             >
+              <motion.img
+                src="/gifs/perros-flores.gif"
+                alt="Perritos con flores"
+                className="w-full max-w-xs h-48 mx-auto block rounded-xl shadow-md mb-4 object-cover"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 260, damping: 20 }}
+              />
               <h1 className="font-handwriting text-3xl sm:text-4xl md:text-5xl text-rose-800 drop-shadow-sm">
                 ¿Quieres ser mi San Valentín? ❤️
               </h1>
@@ -195,6 +204,7 @@ export default function SanValentinPage() {
           )}
         </AnimatePresence>
       </div>
+      <DachshundCompanion isSuccess={accepted} />
     </main>
   );
 }

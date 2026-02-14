@@ -27,58 +27,43 @@ const mensajes = [
 
 const NUM_HEARTS = 18;
 
-/** Límites estrictos para que con translate(-50%, -50%) nada se salga del viewport */
-const FLOAT_LEFT_MIN = 10;
-const FLOAT_LEFT_MAX = 90;
-const FLOAT_TOP_MIN = 10;
-const FLOAT_TOP_MAX = 90;
+/** Sistema de slots: cuadrícula para evitar superposiciones */
+const GRID_COLS = 3;
+const GRID_ROWS = 5;
+const JITTER_PERCENT = 5;
 
-/** Zona prohibida: centro reservado para el título "Sabía que dirías que sí" */
-const CENTER_LEFT_MIN = 30;
-const CENTER_LEFT_MAX = 70;
-const CENTER_TOP_MIN = 35;
-const CENTER_TOP_MAX = 65;
+type Slot = { col: number; row: number };
 
-function getFloatingPosition(avoidCenter = true): { left: number; top: number } {
-  const inRange = (v: number, min: number, max: number) => v >= min && v <= max;
-
-  let left = FLOAT_LEFT_MIN + Math.random() * (FLOAT_LEFT_MAX - FLOAT_LEFT_MIN);
-  let top = FLOAT_TOP_MIN + Math.random() * (FLOAT_TOP_MAX - FLOAT_TOP_MIN);
-
-  const inCenter =
-    avoidCenter &&
-    inRange(left, CENTER_LEFT_MIN, CENTER_LEFT_MAX) &&
-    inRange(top, CENTER_TOP_MIN, CENTER_TOP_MAX);
-
-  if (inCenter) {
-    const zone = Math.floor(Math.random() * 4);
-    switch (zone) {
-      case 0:
-        left = FLOAT_LEFT_MIN + Math.random() * (CENTER_LEFT_MIN - FLOAT_LEFT_MIN);
-        top = FLOAT_TOP_MIN + Math.random() * (FLOAT_TOP_MAX - FLOAT_TOP_MIN);
-        break;
-      case 1:
-        left =
-          CENTER_LEFT_MAX +
-          Math.random() * (FLOAT_LEFT_MAX - CENTER_LEFT_MAX);
-        top = FLOAT_TOP_MIN + Math.random() * (FLOAT_TOP_MAX - FLOAT_TOP_MIN);
-        break;
-      case 2:
-        left = FLOAT_LEFT_MIN + Math.random() * (FLOAT_LEFT_MAX - FLOAT_LEFT_MIN);
-        top = FLOAT_TOP_MIN + Math.random() * (CENTER_TOP_MIN - FLOAT_TOP_MIN);
-        break;
-      case 3:
-        left = FLOAT_LEFT_MIN + Math.random() * (FLOAT_LEFT_MAX - FLOAT_LEFT_MIN);
-        top =
-          CENTER_TOP_MAX + Math.random() * (FLOAT_TOP_MAX - CENTER_TOP_MAX);
-        break;
+function getAvailableSlots(): Slot[] {
+  const centerCol = Math.floor(GRID_COLS / 2);
+  const centerRow = Math.floor(GRID_ROWS / 2);
+  const slots: Slot[] = [];
+  for (let row = 0; row < GRID_ROWS; row++) {
+    for (let col = 0; col < GRID_COLS; col++) {
+      const inCenter = col === centerCol && row === centerRow;
+      if (!inCenter) slots.push({ col, row });
     }
   }
+  return slots;
+}
 
+function getSlotPosition(slot: Slot): { left: number; top: number } {
+  const leftBase = ((slot.col + 0.5) / GRID_COLS) * 100;
+  const topBase = ((slot.row + 0.5) / GRID_ROWS) * 100;
+  const jitter = () => (Math.random() - 0.5) * 2 * JITTER_PERCENT;
   return {
-    left: Math.max(FLOAT_LEFT_MIN, Math.min(FLOAT_LEFT_MAX, left)),
-    top: Math.max(FLOAT_TOP_MIN, Math.min(FLOAT_TOP_MAX, top)),
+    left: Math.max(10, Math.min(90, leftBase + jitter())),
+    top: Math.max(10, Math.min(90, topBase + jitter())),
   };
+}
+
+function shuffle<T>(array: T[]): T[] {
+  const out = [...array];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
 }
 
 function HeartIcon({ className }: { className?: string }) {
@@ -183,24 +168,28 @@ export default function SanValentinPage() {
 
   const floatingItems = useMemo(() => {
     if (!accepted) return [];
-    const images = recuerdos.map((nombreArchivo) => ({
+    const imageItems = recuerdos.map((nombreArchivo) => ({
       type: "image" as const,
       id: nombreArchivo,
       src: `/recuerdos/${nombreArchivo}`,
-      ...getFloatingPosition(),
-      rotate: -8 + Math.random() * 16,
-      size: 0.5 + Math.random() * 0.5,
-      duration: 3 + Math.random() * 3,
     }));
-    const texts = mensajes.map((text, i) => ({
+    const textItems = mensajes.map((text, i) => ({
       type: "text" as const,
       id: `msg-${i}`,
       text,
-      ...getFloatingPosition(),
-      rotate: -6 + Math.random() * 12,
-      duration: 3.5 + Math.random() * 2.5,
     }));
-    return [...images, ...texts];
+    const combined = shuffle([...imageItems, ...textItems]);
+    const slots = shuffle(getAvailableSlots());
+    return combined.slice(0, slots.length).map((item, i) => {
+      const { left, top } = getSlotPosition(slots[i]);
+      return {
+        ...item,
+        left,
+        top,
+        rotate: -6 + Math.random() * 12,
+        duration: 3 + Math.random() * 3,
+      };
+    });
   }, [accepted]);
 
   return (
@@ -294,8 +283,8 @@ export default function SanValentinPage() {
                 ))}
               </div>
 
-              {/* Galería flotante: fotos + mensajes */}
-              <div className="fixed inset-0 pointer-events-none z-10">
+              {/* Galería flotante: fotos + mensajes (sistema de slots, posiciones en %) */}
+              <div className="fixed inset-0 w-full h-full pointer-events-none z-10">
                 {floatingItems.map((item) => (
                   <motion.div
                     key={item.id}
@@ -310,6 +299,7 @@ export default function SanValentinPage() {
                     transition={{ duration: 0.5 }}
                   >
                     <motion.div
+                      className={item.type === "text" ? "relative z-20" : "relative z-10"}
                       style={{ rotate: item.rotate }}
                       animate={{
                         y: [0, -15, 0],
@@ -322,13 +312,7 @@ export default function SanValentinPage() {
                       }}
                     >
                       {item.type === "image" ? (
-                        <div
-                          className="overflow-hidden rounded-2xl shadow-lg bg-rose-100/80"
-                          style={{
-                            width: 88 * (item.size ?? 1),
-                            height: 120 * (item.size ?? 1),
-                          }}
-                        >
+                        <div className="w-40 sm:w-48 md:w-64 lg:w-72 aspect-[3/4] overflow-hidden rounded-2xl shadow-lg bg-rose-100/80">
                           <img
                             src={item.src}
                             alt=""
@@ -337,12 +321,9 @@ export default function SanValentinPage() {
                           />
                         </div>
                       ) : (
-                        <p
-                          className="font-handwriting text-rose-600 text-xl sm:text-2xl md:text-3xl whitespace-nowrap drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]"
-                          style={{ textShadow: "0 0 20px rgba(255,255,255,0.6)" }}
-                        >
+                        <span className="inline-block px-3 py-1.5 rounded-xl bg-white/80 backdrop-blur-sm font-handwriting text-rose-600 text-xl md:text-3xl lg:text-4xl whitespace-nowrap drop-shadow-lg shadow-rose-200/50">
                           {item.text}
-                        </p>
+                        </span>
                       )}
                     </motion.div>
                   </motion.div>

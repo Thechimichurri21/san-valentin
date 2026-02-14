@@ -27,41 +27,6 @@ const mensajes = [
 
 const NUM_HEARTS = 18;
 
-/** Grid 4×5: celdas más anchas, anillo perimetral (centro (1,2) y (2,2) libres) */
-const GRID_COLS = 4;
-const GRID_ROWS = 5;
-const JITTER_PERCENT = 2;
-
-type Slot = { col: number; row: number };
-
-/** 14 slots fijos en anillo perimetral; celdas (1,2) y (2,2) reservadas para el título */
-const FIXED_SLOTS: [number, number][] = [
-  [0, 0],
-  [1, 0],
-  [2, 0],
-  [3, 0],
-  [0, 1],
-  [3, 1],
-  [0, 2],
-  [3, 2],
-  [0, 3],
-  [3, 3],
-  [0, 4],
-  [1, 4],
-  [2, 4],
-  [3, 4],
-];
-
-function getSlotPosition(slot: Slot): { left: number; top: number } {
-  const baseLeft = ((slot.col + 0.5) / GRID_COLS) * 100;
-  const baseTop = ((slot.row + 0.5) / GRID_ROWS) * 100;
-  const jitterX = (Math.random() - 0.5) * 2 * JITTER_PERCENT;
-  const jitterY = (Math.random() - 0.5) * 2 * JITTER_PERCENT;
-  const clampedX = Math.max(20, Math.min(80, baseLeft + jitterX));
-  const clampedY = Math.max(20, Math.min(80, baseTop + jitterY));
-  return { left: clampedX, top: clampedY };
-}
-
 function shuffle<T>(array: T[]): T[] {
   const out = [...array];
   for (let i = out.length - 1; i > 0; i--) {
@@ -171,38 +136,22 @@ export default function SanValentinPage() {
     }));
   }, [accepted]);
 
-  const floatingItems = useMemo(() => {
+  /** B-Roll: fotos + mensajes mezclados, barajados, con duración 3–5 s para flotación */
+  const galleryItems = useMemo(() => {
     if (!accepted) return [];
-    const shuffledRecuerdos = shuffle([...recuerdos]);
-    const shuffledMensajes = shuffle([...mensajes]);
-    return FIXED_SLOTS.map(([col, row], i) => {
-      const { left, top } = getSlotPosition({ col, row });
-      const rotate = -4 + Math.random() * 8;
-      const duration = 3 + Math.random() * 3;
-      if (i % 2 === 0) {
-        const nombreArchivo = shuffledRecuerdos[i / 2];
-        return {
-          type: "image" as const,
-          id: nombreArchivo,
-          src: `/recuerdos/${nombreArchivo}`,
-          left,
-          top,
-          rotate,
-          duration,
-        };
-      }
-      const msgIndex = (i - 1) / 2;
-      const text = shuffledMensajes[msgIndex];
-      return {
-        type: "text" as const,
-        id: `msg-${msgIndex}`,
-        text,
-        left,
-        top,
-        rotate,
-        duration,
-      };
-    });
+    const photos = recuerdos.map((nombreArchivo) => ({
+      type: "photo" as const,
+      id: `photo-${nombreArchivo}`,
+      src: `/recuerdos/${nombreArchivo}`,
+      duration: 3 + Math.random() * 2,
+    }));
+    const texts = mensajes.map((text, i) => ({
+      type: "text" as const,
+      id: `text-${i}`,
+      text,
+      duration: 3 + Math.random() * 2,
+    }));
+    return shuffle([...photos, ...texts]);
   }, [accepted]);
 
   return (
@@ -296,71 +245,66 @@ export default function SanValentinPage() {
                 ))}
               </div>
 
-              {/* Galería flotante: anillo 4×5, pares imagen / impares texto, clamp 20–80% */}
-              <div className="fixed inset-0 w-full h-full pointer-events-none">
-                {floatingItems.map((item) => (
-                  <motion.div
-                    key={item.id}
-                    className={`absolute -translate-x-1/2 -translate-y-1/2 ${item.type === "text" ? "z-40" : "z-30"}`}
-                    style={{
-                      left: `${item.left}%`,
-                      top: `${item.top}%`,
-                      rotate: item.rotate,
-                    }}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.5 }}
-                  >
-                    <motion.div
-                      className="relative"
-                      style={{ rotate: item.rotate }}
-                      animate={{
-                        y: [0, -12, 0],
-                        rotate: [item.rotate - 4, item.rotate + 4, item.rotate - 4],
-                      }}
-                      transition={{
-                        duration: item.duration,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                      }}
-                    >
-                      {item.type === "image" ? (
-                        <div className="w-40 md:w-72 lg:w-80 aspect-[3/4] overflow-hidden rounded-2xl shadow-lg bg-rose-100/80">
-                          <img
-                            src={item.src}
-                            alt=""
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
-                        </div>
-                      ) : (
-                        <span className="inline-block bg-white/20 backdrop-blur-lg border border-white/30 px-3 py-1.5 md:px-4 md:py-2 rounded-2xl shadow-xl font-handwriting text-rose-600 text-xl lg:text-3xl whitespace-nowrap drop-shadow-lg">
-                          {item.text}
-                        </span>
-                      )}
-                    </motion.div>
-                  </motion.div>
-                ))}
-              </div>
-
-              {/* Título central por encima de todo */}
+              {/* Contenido de éxito: título + galería B-Roll en grid */}
               <motion.div
                 key="success"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.5 }}
-                className="relative z-50 text-center"
+                className="relative z-10 flex flex-col items-center"
               >
                 <motion.h1
                   initial={{ scale: 0.8, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                  className="font-handwriting text-3xl sm:text-4xl md:text-5xl text-rose-800 drop-shadow-sm"
+                  className="font-handwriting text-3xl sm:text-4xl md:text-5xl text-rose-800 drop-shadow-sm text-center mb-6"
                 >
                   ¡Sabía que dirías que sí! 😍
                   <br />
                   ¡Feliz San Valentín, mi vida!
                 </motion.h1>
+
+                <section className="w-full grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 p-4 max-w-5xl mx-auto">
+                  {galleryItems.map((item, i) => (
+                    <motion.div
+                      key={item.id}
+                      initial={{ opacity: 0, y: 16 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 + i * 0.08, duration: 0.4 }}
+                      className="overflow-hidden rounded-2xl shadow-lg aspect-[3/4]"
+                    >
+                      <motion.div
+                        className="h-full w-full flex items-center justify-center"
+                        animate={{
+                          y: [0, -10, 0],
+                          rotate: [-2, 2, -2],
+                        }}
+                        transition={{
+                          duration: item.duration,
+                          repeat: Infinity,
+                          ease: "easeInOut",
+                        }}
+                      >
+                        {item.type === "photo" ? (
+                          <div className="h-full w-full overflow-hidden rounded-2xl bg-rose-100/80">
+                            <img
+                              src={item.src}
+                              alt=""
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          </div>
+                        ) : (
+                          <div className="h-full w-full bg-white/40 backdrop-blur-md border border-white/60 shadow-lg rounded-2xl flex items-center justify-center p-4 text-center">
+                            <p className="font-handwriting text-rose-600 text-lg sm:text-xl md:text-2xl">
+                              {item.text}
+                            </p>
+                          </div>
+                        )}
+                      </motion.div>
+                    </motion.div>
+                  ))}
+                </section>
               </motion.div>
             </>
           )}

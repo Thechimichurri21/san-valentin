@@ -27,33 +27,41 @@ const mensajes = [
 
 const NUM_HEARTS = 18;
 
-/** Sistema de slots: cuadrícula para evitar superposiciones */
-const GRID_COLS = 3;
-const GRID_ROWS = 5;
-const JITTER_PERCENT = 5;
+/** Cuadrícula 6×7: slots sin celdas adyacentes (distancia Chebyshev ≥ 2) */
+const GRID_COLS = 6;
+const GRID_ROWS = 7;
+const JITTER_PERCENT = 3;
 
 type Slot = { col: number; row: number };
 
-function getAvailableSlots(): Slot[] {
-  const centerCol = Math.floor(GRID_COLS / 2);
-  const centerRow = Math.floor(GRID_ROWS / 2);
-  const slots: Slot[] = [];
-  for (let row = 0; row < GRID_ROWS; row++) {
-    for (let col = 0; col < GRID_COLS; col++) {
-      const inCenter = col === centerCol && row === centerRow;
-      if (!inCenter) slots.push({ col, row });
-    }
-  }
-  return slots;
-}
+/**
+ * 14 slots: 12 en patrón (0,2,4)×(0,2,4,6) + 2 en columnas 1 y 5.
+ * Los 12 tienen separación estricta; (1,3) y (5,3) quedan en laterales para minimizar solapamiento.
+ */
+const FLOATING_SLOTS: Slot[] = [
+  { col: 0, row: 0 },
+  { col: 0, row: 2 },
+  { col: 0, row: 4 },
+  { col: 0, row: 6 },
+  { col: 2, row: 0 },
+  { col: 2, row: 2 },
+  { col: 2, row: 4 },
+  { col: 2, row: 6 },
+  { col: 4, row: 0 },
+  { col: 4, row: 2 },
+  { col: 4, row: 4 },
+  { col: 4, row: 6 },
+  { col: 1, row: 3 },
+  { col: 5, row: 3 },
+];
 
 function getSlotPosition(slot: Slot): { left: number; top: number } {
   const leftBase = ((slot.col + 0.5) / GRID_COLS) * 100;
   const topBase = ((slot.row + 0.5) / GRID_ROWS) * 100;
   const jitter = () => (Math.random() - 0.5) * 2 * JITTER_PERCENT;
   return {
-    left: Math.max(10, Math.min(90, leftBase + jitter())),
-    top: Math.max(10, Math.min(90, topBase + jitter())),
+    left: Math.max(8, Math.min(92, leftBase + jitter())),
+    top: Math.max(8, Math.min(92, topBase + jitter())),
   };
 }
 
@@ -179,14 +187,14 @@ export default function SanValentinPage() {
       text,
     }));
     const combined = shuffle([...imageItems, ...textItems]);
-    const slots = shuffle(getAvailableSlots());
+    const slots = shuffle([...FLOATING_SLOTS]);
     return combined.slice(0, slots.length).map((item, i) => {
       const { left, top } = getSlotPosition(slots[i]);
       return {
         ...item,
         left,
         top,
-        rotate: -6 + Math.random() * 12,
+        rotate: -4 + Math.random() * 8,
         duration: 3 + Math.random() * 3,
       };
     });
@@ -283,12 +291,12 @@ export default function SanValentinPage() {
                 ))}
               </div>
 
-              {/* Galería flotante: fotos + mensajes (sistema de slots, posiciones en %) */}
-              <div className="fixed inset-0 w-full h-full pointer-events-none z-10">
+              {/* Galería flotante: fotos (z-30) y mensajes (z-40), slots 6×7 sin adyacentes */}
+              <div className="fixed inset-0 w-full h-full pointer-events-none">
                 {floatingItems.map((item) => (
                   <motion.div
                     key={item.id}
-                    className="absolute -translate-x-1/2 -translate-y-1/2"
+                    className={`absolute -translate-x-1/2 -translate-y-1/2 ${item.type === "text" ? "z-40" : "z-30"}`}
                     style={{
                       left: `${item.left}%`,
                       top: `${item.top}%`,
@@ -299,11 +307,11 @@ export default function SanValentinPage() {
                     transition={{ duration: 0.5 }}
                   >
                     <motion.div
-                      className={item.type === "text" ? "relative z-20" : "relative z-10"}
+                      className="relative"
                       style={{ rotate: item.rotate }}
                       animate={{
-                        y: [0, -15, 0],
-                        rotate: [item.rotate - 5, item.rotate + 5, item.rotate - 5],
+                        y: [0, -12, 0],
+                        rotate: [item.rotate - 4, item.rotate + 4, item.rotate - 4],
                       }}
                       transition={{
                         duration: item.duration,
@@ -312,7 +320,7 @@ export default function SanValentinPage() {
                       }}
                     >
                       {item.type === "image" ? (
-                        <div className="w-40 sm:w-48 md:w-64 lg:w-72 aspect-[3/4] overflow-hidden rounded-2xl shadow-lg bg-rose-100/80">
+                        <div className="w-44 md:w-72 lg:w-80 aspect-[3/4] overflow-hidden rounded-2xl shadow-lg bg-rose-100/80">
                           <img
                             src={item.src}
                             alt=""
@@ -321,7 +329,7 @@ export default function SanValentinPage() {
                           />
                         </div>
                       ) : (
-                        <span className="inline-block px-3 py-1.5 rounded-xl bg-white/80 backdrop-blur-sm font-handwriting text-rose-600 text-xl md:text-3xl lg:text-4xl whitespace-nowrap drop-shadow-lg shadow-rose-200/50">
+                        <span className="inline-block bg-white/20 backdrop-blur-lg border border-white/30 px-4 py-2 rounded-2xl shadow-xl font-handwriting text-rose-600 text-xl lg:text-3xl whitespace-nowrap drop-shadow-lg">
                           {item.text}
                         </span>
                       )}
@@ -330,13 +338,13 @@ export default function SanValentinPage() {
                 ))}
               </div>
 
-              {/* Contenido principal (título) por encima de la galería */}
+              {/* Título central por encima de todo */}
               <motion.div
                 key="success"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.5 }}
-                className="relative z-20 text-center"
+                className="relative z-50 text-center"
               >
                 <motion.h1
                   initial={{ scale: 0.8, opacity: 0 }}

@@ -27,16 +27,57 @@ const mensajes = [
 
 const NUM_HEARTS = 18;
 
+/** Límites estrictos para que con translate(-50%, -50%) nada se salga del viewport */
+const FLOAT_LEFT_MIN = 10;
+const FLOAT_LEFT_MAX = 90;
+const FLOAT_TOP_MIN = 10;
+const FLOAT_TOP_MAX = 90;
+
+/** Zona prohibida: centro reservado para el título "Sabía que dirías que sí" */
+const CENTER_LEFT_MIN = 30;
+const CENTER_LEFT_MAX = 70;
+const CENTER_TOP_MIN = 35;
+const CENTER_TOP_MAX = 65;
+
 function getFloatingPosition(avoidCenter = true): { left: number; top: number } {
-  let left = Math.random() * 100;
-  let top = Math.random() * 100;
-  if (avoidCenter && left > 35 && left < 65 && top > 28 && top < 52) {
-    left += (Math.random() > 0.5 ? 1 : -1) * (22 + Math.random() * 12);
-    top += (Math.random() > 0.5 ? 1 : -1) * (18 + Math.random() * 12);
+  const inRange = (v: number, min: number, max: number) => v >= min && v <= max;
+
+  let left = FLOAT_LEFT_MIN + Math.random() * (FLOAT_LEFT_MAX - FLOAT_LEFT_MIN);
+  let top = FLOAT_TOP_MIN + Math.random() * (FLOAT_TOP_MAX - FLOAT_TOP_MIN);
+
+  const inCenter =
+    avoidCenter &&
+    inRange(left, CENTER_LEFT_MIN, CENTER_LEFT_MAX) &&
+    inRange(top, CENTER_TOP_MIN, CENTER_TOP_MAX);
+
+  if (inCenter) {
+    const zone = Math.floor(Math.random() * 4);
+    switch (zone) {
+      case 0:
+        left = FLOAT_LEFT_MIN + Math.random() * (CENTER_LEFT_MIN - FLOAT_LEFT_MIN);
+        top = FLOAT_TOP_MIN + Math.random() * (FLOAT_TOP_MAX - FLOAT_TOP_MIN);
+        break;
+      case 1:
+        left =
+          CENTER_LEFT_MAX +
+          Math.random() * (FLOAT_LEFT_MAX - CENTER_LEFT_MAX);
+        top = FLOAT_TOP_MIN + Math.random() * (FLOAT_TOP_MAX - FLOAT_TOP_MIN);
+        break;
+      case 2:
+        left = FLOAT_LEFT_MIN + Math.random() * (FLOAT_LEFT_MAX - FLOAT_LEFT_MIN);
+        top = FLOAT_TOP_MIN + Math.random() * (CENTER_TOP_MIN - FLOAT_TOP_MIN);
+        break;
+      case 3:
+        left = FLOAT_LEFT_MIN + Math.random() * (FLOAT_LEFT_MAX - FLOAT_LEFT_MIN);
+        top =
+          CENTER_TOP_MAX + Math.random() * (FLOAT_TOP_MAX - CENTER_TOP_MAX);
+        break;
+    }
   }
+
   return {
-    left: Math.max(2, Math.min(95, left)),
-    top: Math.max(2, Math.min(95, top)),
+    left: Math.max(FLOAT_LEFT_MIN, Math.min(FLOAT_LEFT_MAX, left)),
+    top: Math.max(FLOAT_TOP_MIN, Math.min(FLOAT_TOP_MAX, top)),
   };
 }
 
@@ -148,7 +189,7 @@ export default function SanValentinPage() {
       src: `/recuerdos/${nombreArchivo}`,
       ...getFloatingPosition(),
       rotate: -8 + Math.random() * 16,
-      size: 0.7 + Math.random() * 0.8,
+      size: 0.5 + Math.random() * 0.5,
       duration: 3 + Math.random() * 3,
     }));
     const texts = mensajes.map((text, i) => ({

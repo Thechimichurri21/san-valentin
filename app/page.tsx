@@ -136,22 +136,26 @@ export default function SanValentinPage() {
     }));
   }, [accepted]);
 
-  /** B-Roll: fotos + mensajes mezclados, barajados, con duración 3–5 s para flotación */
+  /** B-Roll: solo fotos en grid estable */
   const galleryItems = useMemo(() => {
     if (!accepted) return [];
-    const photos = recuerdos.map((nombreArchivo) => ({
-      type: "photo" as const,
-      id: `photo-${nombreArchivo}`,
+    return recuerdos.map((nombreArchivo) => ({
+      id: nombreArchivo,
       src: `/recuerdos/${nombreArchivo}`,
       duration: 3 + Math.random() * 2,
     }));
-    const texts = mensajes.map((text, i) => ({
-      type: "text" as const,
-      id: `text-${i}`,
+  }, [accepted]);
+
+  /** Mensajes flotantes: posiciones 10–85% left, 15–85% top; en móvil solo se muestran 4 (CSS) */
+  const floatingMessages = useMemo(() => {
+    if (!accepted) return [];
+    return mensajes.map((text, i) => ({
+      id: `msg-${i}`,
       text,
-      duration: 3 + Math.random() * 2,
+      left: 10 + Math.random() * 75,
+      top: 15 + Math.random() * 70,
+      duration: 5 + Math.random() * 3,
     }));
-    return shuffle([...photos, ...texts]);
   }, [accepted]);
 
   return (
@@ -245,25 +249,66 @@ export default function SanValentinPage() {
                 ))}
               </div>
 
-              {/* Contenido de éxito: título + galería B-Roll en grid */}
+              {/* Capa de frases flotantes (z-30), margen 10–85% / 15–85% para no cortar en bordes */}
+              <div className="absolute inset-0 pointer-events-none z-30">
+                {floatingMessages.map((msg, index) => (
+                  <motion.div
+                    key={msg.id}
+                    className={`absolute -translate-x-1/2 -translate-y-1/2 ${index >= 4 ? "max-sm:hidden" : ""}`}
+                    style={{
+                      left: `${msg.left}%`,
+                      top: `${msg.top}%`,
+                    }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: index * 0.15, duration: 0.5 }}
+                  >
+                    <motion.span
+                      className="inline-block bg-white/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/60 shadow-lg shadow-rose-200/50 font-handwriting text-rose-600 text-sm sm:text-lg whitespace-nowrap"
+                      animate={{
+                        x: [0, 15, -15, 0],
+                        y: [0, -20, 10, 0],
+                      }}
+                      transition={{
+                        duration: msg.duration,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      }}
+                    >
+                      {msg.text}
+                    </motion.span>
+                  </motion.div>
+                ))}
+              </div>
+
+              {/* Título central por encima de las frases (z-40) para que no lo tapen */}
               <motion.div
-                key="success"
+                key="success-header"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.5 }}
-                className="relative z-10 flex flex-col items-center"
+                className="relative z-40 text-center mb-6"
               >
                 <motion.h1
                   initial={{ scale: 0.8, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                  className="font-handwriting text-3xl sm:text-4xl md:text-5xl text-rose-800 drop-shadow-sm text-center mb-6"
+                  className="font-handwriting text-3xl sm:text-4xl md:text-5xl text-rose-800 drop-shadow-sm"
                 >
                   ¡Sabía que dirías que sí! 😍
                   <br />
                   ¡Feliz San Valentín, mi vida!
                 </motion.h1>
+              </motion.div>
 
+              {/* Galería B-Roll solo fotos (z-10) */}
+              <motion.div
+                key="success-grid"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.5 }}
+                className="relative z-10 w-full flex flex-col items-center"
+              >
                 <section className="w-full grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 p-4 max-w-5xl mx-auto">
                   {galleryItems.map((item, i) => (
                     <motion.div
@@ -271,10 +316,10 @@ export default function SanValentinPage() {
                       initial={{ opacity: 0, y: 16 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.3 + i * 0.08, duration: 0.4 }}
-                      className="overflow-hidden rounded-2xl shadow-lg aspect-[3/4]"
+                      className="overflow-hidden rounded-2xl shadow-lg bg-rose-100/80 aspect-[3/4]"
                     >
                       <motion.div
-                        className="h-full w-full flex items-center justify-center"
+                        className="h-full w-full"
                         animate={{
                           y: [0, -10, 0],
                           rotate: [-2, 2, -2],
@@ -285,22 +330,12 @@ export default function SanValentinPage() {
                           ease: "easeInOut",
                         }}
                       >
-                        {item.type === "photo" ? (
-                          <div className="h-full w-full overflow-hidden rounded-2xl bg-rose-100/80">
-                            <img
-                              src={item.src}
-                              alt=""
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                            />
-                          </div>
-                        ) : (
-                          <div className="h-full w-full bg-white/40 backdrop-blur-md border border-white/60 shadow-lg rounded-2xl flex items-center justify-center p-4 text-center">
-                            <p className="font-handwriting text-rose-600 text-lg sm:text-xl md:text-2xl">
-                              {item.text}
-                            </p>
-                          </div>
-                        )}
+                        <img
+                          src={item.src}
+                          alt=""
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
                       </motion.div>
                     </motion.div>
                   ))}

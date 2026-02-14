@@ -27,42 +27,39 @@ const mensajes = [
 
 const NUM_HEARTS = 18;
 
-/** Cuadrícula 6×7: slots sin celdas adyacentes (distancia Chebyshev ≥ 2) */
-const GRID_COLS = 6;
-const GRID_ROWS = 7;
-const JITTER_PERCENT = 3;
+/** Grid 4×5: celdas más anchas, anillo perimetral (centro (1,2) y (2,2) libres) */
+const GRID_COLS = 4;
+const GRID_ROWS = 5;
+const JITTER_PERCENT = 2;
 
 type Slot = { col: number; row: number };
 
-/**
- * 14 slots: 12 en patrón (0,2,4)×(0,2,4,6) + 2 en columnas 1 y 5.
- * Los 12 tienen separación estricta; (1,3) y (5,3) quedan en laterales para minimizar solapamiento.
- */
-const FLOATING_SLOTS: Slot[] = [
-  { col: 0, row: 0 },
-  { col: 0, row: 2 },
-  { col: 0, row: 4 },
-  { col: 0, row: 6 },
-  { col: 2, row: 0 },
-  { col: 2, row: 2 },
-  { col: 2, row: 4 },
-  { col: 2, row: 6 },
-  { col: 4, row: 0 },
-  { col: 4, row: 2 },
-  { col: 4, row: 4 },
-  { col: 4, row: 6 },
-  { col: 1, row: 3 },
-  { col: 5, row: 3 },
+/** 14 slots fijos en anillo perimetral; celdas (1,2) y (2,2) reservadas para el título */
+const FIXED_SLOTS: [number, number][] = [
+  [0, 0],
+  [1, 0],
+  [2, 0],
+  [3, 0],
+  [0, 1],
+  [3, 1],
+  [0, 2],
+  [3, 2],
+  [0, 3],
+  [3, 3],
+  [0, 4],
+  [1, 4],
+  [2, 4],
+  [3, 4],
 ];
 
 function getSlotPosition(slot: Slot): { left: number; top: number } {
-  const leftBase = ((slot.col + 0.5) / GRID_COLS) * 100;
-  const topBase = ((slot.row + 0.5) / GRID_ROWS) * 100;
-  const jitter = () => (Math.random() - 0.5) * 2 * JITTER_PERCENT;
-  return {
-    left: Math.max(8, Math.min(92, leftBase + jitter())),
-    top: Math.max(8, Math.min(92, topBase + jitter())),
-  };
+  const baseLeft = ((slot.col + 0.5) / GRID_COLS) * 100;
+  const baseTop = ((slot.row + 0.5) / GRID_ROWS) * 100;
+  const jitterX = (Math.random() - 0.5) * 2 * JITTER_PERCENT;
+  const jitterY = (Math.random() - 0.5) * 2 * JITTER_PERCENT;
+  const clampedX = Math.max(20, Math.min(80, baseLeft + jitterX));
+  const clampedY = Math.max(20, Math.min(80, baseTop + jitterY));
+  return { left: clampedX, top: clampedY };
 }
 
 function shuffle<T>(array: T[]): T[] {
@@ -176,26 +173,34 @@ export default function SanValentinPage() {
 
   const floatingItems = useMemo(() => {
     if (!accepted) return [];
-    const imageItems = recuerdos.map((nombreArchivo) => ({
-      type: "image" as const,
-      id: nombreArchivo,
-      src: `/recuerdos/${nombreArchivo}`,
-    }));
-    const textItems = mensajes.map((text, i) => ({
-      type: "text" as const,
-      id: `msg-${i}`,
-      text,
-    }));
-    const combined = shuffle([...imageItems, ...textItems]);
-    const slots = shuffle([...FLOATING_SLOTS]);
-    return combined.slice(0, slots.length).map((item, i) => {
-      const { left, top } = getSlotPosition(slots[i]);
+    const shuffledRecuerdos = shuffle([...recuerdos]);
+    const shuffledMensajes = shuffle([...mensajes]);
+    return FIXED_SLOTS.map(([col, row], i) => {
+      const { left, top } = getSlotPosition({ col, row });
+      const rotate = -4 + Math.random() * 8;
+      const duration = 3 + Math.random() * 3;
+      if (i % 2 === 0) {
+        const nombreArchivo = shuffledRecuerdos[i / 2];
+        return {
+          type: "image" as const,
+          id: nombreArchivo,
+          src: `/recuerdos/${nombreArchivo}`,
+          left,
+          top,
+          rotate,
+          duration,
+        };
+      }
+      const msgIndex = (i - 1) / 2;
+      const text = shuffledMensajes[msgIndex];
       return {
-        ...item,
+        type: "text" as const,
+        id: `msg-${msgIndex}`,
+        text,
         left,
         top,
-        rotate: -4 + Math.random() * 8,
-        duration: 3 + Math.random() * 3,
+        rotate,
+        duration,
       };
     });
   }, [accepted]);
@@ -291,7 +296,7 @@ export default function SanValentinPage() {
                 ))}
               </div>
 
-              {/* Galería flotante: fotos (z-30) y mensajes (z-40), slots 6×7 sin adyacentes */}
+              {/* Galería flotante: anillo 4×5, pares imagen / impares texto, clamp 20–80% */}
               <div className="fixed inset-0 w-full h-full pointer-events-none">
                 {floatingItems.map((item) => (
                   <motion.div
@@ -320,7 +325,7 @@ export default function SanValentinPage() {
                       }}
                     >
                       {item.type === "image" ? (
-                        <div className="w-44 md:w-72 lg:w-80 aspect-[3/4] overflow-hidden rounded-2xl shadow-lg bg-rose-100/80">
+                        <div className="w-40 md:w-72 lg:w-80 aspect-[3/4] overflow-hidden rounded-2xl shadow-lg bg-rose-100/80">
                           <img
                             src={item.src}
                             alt=""
@@ -329,7 +334,7 @@ export default function SanValentinPage() {
                           />
                         </div>
                       ) : (
-                        <span className="inline-block bg-white/20 backdrop-blur-lg border border-white/30 px-4 py-2 rounded-2xl shadow-xl font-handwriting text-rose-600 text-xl lg:text-3xl whitespace-nowrap drop-shadow-lg">
+                        <span className="inline-block bg-white/20 backdrop-blur-lg border border-white/30 px-3 py-1.5 md:px-4 md:py-2 rounded-2xl shadow-xl font-handwriting text-rose-600 text-xl lg:text-3xl whitespace-nowrap drop-shadow-lg">
                           {item.text}
                         </span>
                       )}

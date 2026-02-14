@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import DachshundCompanion from "@/components/DachshundCompanion";
 
@@ -14,6 +14,44 @@ const recuerdos = [
   "foto6.jpeg",
   "foto7.jpeg",
 ];
+
+const mensajes = [
+  "Te amo Valeria",
+  "Valeria la mejor novia del mundo",
+  "Eres mi todo",
+  "Siempre juntos",
+  "Gracias por existir",
+  "Te amo mi flaca",
+  "Mi niña hermosa",
+];
+
+const NUM_HEARTS = 18;
+
+function getFloatingPosition(avoidCenter = true): { left: number; top: number } {
+  let left = Math.random() * 100;
+  let top = Math.random() * 100;
+  if (avoidCenter && left > 35 && left < 65 && top > 28 && top < 52) {
+    left += (Math.random() > 0.5 ? 1 : -1) * (22 + Math.random() * 12);
+    top += (Math.random() > 0.5 ? 1 : -1) * (18 + Math.random() * 12);
+  }
+  return {
+    left: Math.max(2, Math.min(95, left)),
+    top: Math.max(2, Math.min(95, top)),
+  };
+}
+
+function HeartIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+      aria-hidden
+    >
+      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+    </svg>
+  );
+}
 
 function useConfetti() {
   const mounted = useRef(true);
@@ -89,6 +127,41 @@ export default function SanValentinPage() {
     []
   );
 
+  const heartConfigs = useMemo(() => {
+    if (!accepted) return [];
+    return Array.from({ length: NUM_HEARTS }, (_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      top: Math.random() * 100,
+      opacity: 0.2 + Math.random() * 0.3,
+      duration: 18 + Math.random() * 12,
+      delay: Math.random() * 8,
+      size: 16 + Math.random() * 24,
+    }));
+  }, [accepted]);
+
+  const floatingItems = useMemo(() => {
+    if (!accepted) return [];
+    const images = recuerdos.map((nombreArchivo) => ({
+      type: "image" as const,
+      id: nombreArchivo,
+      src: `/recuerdos/${nombreArchivo}`,
+      ...getFloatingPosition(),
+      rotate: -8 + Math.random() * 16,
+      size: 0.7 + Math.random() * 0.8,
+      duration: 3 + Math.random() * 3,
+    }));
+    const texts = mensajes.map((text, i) => ({
+      type: "text" as const,
+      id: `msg-${i}`,
+      text,
+      ...getFloatingPosition(),
+      rotate: -6 + Math.random() * 12,
+      duration: 3.5 + Math.random() * 2.5,
+    }));
+    return [...images, ...texts];
+  }, [accepted]);
+
   return (
     <main className="min-h-screen overflow-x-hidden py-8 px-4 sm:px-6 lg:px-8 flex flex-col items-center">
       <div className="w-full max-w-2xl mx-auto text-center">
@@ -153,54 +226,108 @@ export default function SanValentinPage() {
               </div>
             </motion.div>
           ) : (
-            <motion.div
-              key="success"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5 }}
-              className="space-y-10"
-            >
-              <motion.h1
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                className="font-handwriting text-3xl sm:text-4xl md:text-5xl text-rose-800"
-              >
-                ¡Sabía que dirías que sí! 😍
-                ¡Feliz San Valentín, mi vida!
-              </motion.h1>
+            <>
+              {/* Fondo de corazones flotantes */}
+              <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+                {heartConfigs.map((heart) => (
+                  <motion.div
+                    key={heart.id}
+                    className="absolute text-rose-400"
+                    style={{
+                      left: `${heart.left}%`,
+                      width: heart.size,
+                      height: heart.size,
+                      opacity: heart.opacity,
+                    }}
+                    initial={{ top: "100vh" }}
+                    animate={{ top: "-10%" }}
+                    transition={{
+                      duration: heart.duration,
+                      repeat: Infinity,
+                      ease: "linear",
+                      delay: heart.delay,
+                    }}
+                  >
+                    <HeartIcon className="w-full h-full" />
+                  </motion.div>
+                ))}
+              </div>
 
-              <motion.section
-                initial={{ opacity: 0, y: 24 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6, duration: 0.6 }}
-                className="pt-8"
-              >
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-                  {recuerdos.map((nombreArchivo, i) => (
+              {/* Galería flotante: fotos + mensajes */}
+              <div className="fixed inset-0 pointer-events-none z-10">
+                {floatingItems.map((item) => (
+                  <motion.div
+                    key={item.id}
+                    className="absolute -translate-x-1/2 -translate-y-1/2"
+                    style={{
+                      left: `${item.left}%`,
+                      top: `${item.top}%`,
+                      rotate: item.rotate,
+                    }}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.5 }}
+                  >
                     <motion.div
-                      key={nombreArchivo}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{
-                        delay: 0.8 + i * 0.1,
-                        duration: 0.5,
+                      style={{ rotate: item.rotate }}
+                      animate={{
+                        y: [0, -15, 0],
+                        rotate: [item.rotate - 5, item.rotate + 5, item.rotate - 5],
                       }}
-                      className="overflow-hidden rounded-2xl shadow-lg aspect-[2/3] bg-rose-100"
-                      whileHover={{ scale: 1.05 }}
+                      transition={{
+                        duration: item.duration,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      }}
                     >
-                      <img
-                        src={`/recuerdos/${nombreArchivo}`}
-                        alt=""
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                      />
+                      {item.type === "image" ? (
+                        <div
+                          className="overflow-hidden rounded-2xl shadow-lg bg-rose-100/80"
+                          style={{
+                            width: 88 * (item.size ?? 1),
+                            height: 120 * (item.size ?? 1),
+                          }}
+                        >
+                          <img
+                            src={item.src}
+                            alt=""
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        </div>
+                      ) : (
+                        <p
+                          className="font-handwriting text-rose-600 text-xl sm:text-2xl md:text-3xl whitespace-nowrap drop-shadow-[0_1px_2px_rgba(255,255,255,0.9)]"
+                          style={{ textShadow: "0 0 20px rgba(255,255,255,0.6)" }}
+                        >
+                          {item.text}
+                        </p>
+                      )}
                     </motion.div>
-                  ))}
-                </div>
-              </motion.section>
-            </motion.div>
+                  </motion.div>
+                ))}
+              </div>
+
+              {/* Contenido principal (título) por encima de la galería */}
+              <motion.div
+                key="success"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.5 }}
+                className="relative z-20 text-center"
+              >
+                <motion.h1
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                  className="font-handwriting text-3xl sm:text-4xl md:text-5xl text-rose-800 drop-shadow-sm"
+                >
+                  ¡Sabía que dirías que sí! 😍
+                  <br />
+                  ¡Feliz San Valentín, mi vida!
+                </motion.h1>
+              </motion.div>
+            </>
           )}
         </AnimatePresence>
       </div>
